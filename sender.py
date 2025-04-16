@@ -6,51 +6,53 @@ from websocket import create_connection
 import json
 import random
 
+
 def send(self, token, channel_id, message, delay, image):
-    messages = message.split(',')
-
-    def sendMessage(token, channelid, messages, image):
-        message = random.choice(messages)
-        ws = create_connection("wss://gateway.discord.gg/")
-        data = '''
-        {
-            "op": 2,
-            "d":{
-                "token": "%s",
-                "properties": {
-                    "$os": "linux",
-                    "$browser": "ubuntu",
-                    "$device": "ubuntu"
-                },
-            }
-        }
-        ''' % token
-        ws.send(data)
-        if image != '':
-            headers = {'authorization': token}
-            files = {'files[0]': open(image, 'rb')}
-            files['payload_json'] = (None, json.dumps({'content': message}))
-            req.post("https://discordapp.com/api/v9/channels/%s/messages" % channelid, headers = headers, files=files)
-        else:
-            headers = {'authorization': token, 'Content-Type': 'application/json'}
-            payload = {"content":message,"tts":False}
-            req.post("https://discordapp.com/api/v9/channels/%s/messages" % channelid, headers = headers, json=payload)
+    def sendMessage(token, channel_id, message, image):
         try:
-            ws.close()
-        except:
-            pass
-        current_datetime = datetime.now()
-        self.logsbeep.emit(f"{current_datetime}  |   MSG sended to {channel_id}")
+            ws = create_connection("wss://gateway.discord.gg/")
+            data = '''
+            {
+                "op": 2,
+                "d":{
+                    "token": "%s",
+                    "properties": {
+                        "$os": "linux",
+                        "$browser": "ubuntu",
+                        "$device": "ubuntu"
+                    }
+                }
+            }
+            ''' % token
+            ws.send(data)
 
+            headers = {'authorization': token}
+            if image != '':
+                try:
+                    files = {'file': open(image, 'rb')}
+                    data = {'content': message}
+                    req.post(f"https://discord.com/api/v9/channels/{channel_id}/messages",
+                             headers=headers, files=files, data=data)
+                except Exception as e:
+                    self.logsbeep.emit(f"Error sending image: {str(e)}")
+            else:
+                payload = {"content": message, "tts": False}
+                req.post(f"https://discord.com/api/v9/channels/{channel_id}/messages",
+                         headers=headers, json=payload)
 
-    def time():
-        sendMessage(token, channel_id, messages, image)
+            current_datetime = datetime.now()
+            self.logsbeep.emit(f"{current_datetime} | MSG sent to {channel_id}")
 
-    tokens = token.split()
-    for token in tokens:    
-        sendMessage(token, channel_id, messages, image)
-        schedule.every(int(delay)).seconds.do(time)
+        except Exception as e:
+            self.logsbeep.emit(f"Error: {str(e)}")
+        finally:
+            try:
+                ws.close()
+            except:
+                pass
 
-    while True:
-        schedule.run_pending()
-        sleep(1)
+    # Remove the schedule usage and just send directly
+    if not self.running:
+        return
+
+    sendMessage(token, channel_id, message, image)
